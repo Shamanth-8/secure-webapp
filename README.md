@@ -1,6 +1,6 @@
 # 🔐 Secure Web App + SAST Pipeline
 
-> **Portfolio angle:** Built intentionally vulnerable Flask app, identified 12 OWASP flaws, applied fixes, deployed secure version in Docker with hardened CI/CD pipeline.
+> **Description: ** Built intentionally vulnerable Flask app, identified 12 OWASP flaws, applied fixes, deployed secure version in Docker with hardened CI/CD pipeline.
 
 ---
 
