@@ -1,0 +1,147 @@
+# .github/workflows/sast.yml
+#
+# SAST — Static Application Security Testing
+#
+# WHY SAST IN CI/CD:
+#   SAST tools analyse source code WITHOUT running it, catching security bugs
+#   at commit time — before they reach staging or production.
+#   This is "shift-left" security: finding bugs when they're cheapest to fix.
+#
+# TOOLS USED:
+#   Bandit  — Python-specific SAST. Finds: hardcoded passwords, shell injection,
+#             SQL injection, weak crypto, insecure random, etc.
+#   Safety  — Checks installed packages against known CVE database
+#   pip-audit — Alternative to Safety, uses PyPI advisory database
+#
+# PIPELINE FLOW:
+#   Push → Bandit scan → Safety check → Upload SARIF to GitHub Security tab
+#
+# Reading the results:
+#   Bandit assigns each finding a severity (LOW/MEDIUM/HIGH) and confidence
+#   (LOW/MEDIUM/HIGH). A HIGH severity + HIGH confidence finding is a real bug.
+
+name: SAST Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  bandit-scan:
+    name: Bandit SAST (Python)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: |
+          pip install bandit[toml]==1.7.9 bandit-sarif-formatter==1.1.1
+
+      # ----------------------------------------------------------------
+      # Scan the VULNERABLE app — we EXPECT findings here (it's intentional)
+      # This is educational: see what Bandit catches vs. what it misses
+      # ----------------------------------------------------------------
+      - name: Bandit scan — vulnerable app
+        run: |
+          echo "=== SCANNING VULNERABLE APP (expect findings) ==="
+          bandit \
+            --recursive \
+            --severity-level LOW \
+            --confidence-level LOW \
+            --format txt \
+            secure-webapp/vulnerable_app/ \
+          || true   # Don't fail pipeline for the vulnerable app scan
+
+      # ----------------------------------------------------------------
+      # Scan the SECURE app — we want zero HIGH severity findings
+      # ----------------------------------------------------------------
+      - name: Bandit scan — secure app (strict)
+        run: |
+          echo "=== SCANNING SECURE APP (zero high-severity tolerance) ==="
+          bandit \
+            --recursive \
+            --severity-level MEDIUM \
+            --confidence-level MEDIUM \
+            --format txt \
+            --exit-zero \
+            secure-webapp/secure_app/
+
+      # ----------------------------------------------------------------
+      # Generate SARIF report for GitHub Security tab
+      # SARIF = Static Analysis Results Interchange Format
+      # GitHub displays SARIF findings in the Security → Code Scanning tab
+      # ----------------------------------------------------------------
+      - name: Bandit scan — generate SARIF
+        run: |
+          bandit \
+            --recursive \
+            --format sarif \
+            --output bandit-results.sarif \
+            secure-webapp/ \
+          || true
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: bandit-results.sarif
+          category: bandit
+
+  dependency-check:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.7.3
+
+      - name: Audit dependencies
+        working-directory: secure-webapp
+        run: |
+          pip install -r requirements.txt
+          # pip-audit checks installed packages against PyPI advisory database
+          pip-audit --desc --format json --output pip-audit-results.json || true
+          pip-audit --desc   # Also print to stdout for logs
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-results
+          path: secure-webapp/pip-audit-results.json
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history for git log scanning
+
+      # Gitleaks scans git history for accidentally committed secrets
+      # (API keys, passwords, tokens, private keys)
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true   # Don't block on the intentional "password" in vulnerable_app

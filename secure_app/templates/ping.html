@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Ping{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="card" style="margin-top:2rem">
+    <h2>📡 Ping Tool</h2>
+    <form method="get">
+      <label>Hostname or IP</label>
+      <input type="text" name="host" value="{{ host }}" placeholder="e.g. 127.0.0.1">
+      <button type="submit" class="btn btn-primary">Ping</button>
+    </form>
+    {% if output %}
+    <hr style="margin:1.25rem 0;border-color:#f1f3f5">
+    <pre style="background:#1a1a2e;color:#f8f8f2;padding:1rem;border-radius:6px;font-size:0.8rem;overflow-x:auto">{{ output }}</pre>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

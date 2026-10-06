@@ -1,0 +1,10 @@
+*.db
+**/__pycache__
+htmlcov
+.coverage
+.pytest_cache
+venv
+.venv
+nginx/certs
+.github
+.env

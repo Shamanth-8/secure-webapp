@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<div class="container" style="max-width:640px">
+  <div class="card" style="margin-top:2rem">
+    <h2>🔍 Search Notes</h2>
+    <form method="get">
+      <label>Query</label>
+      <input type="text" name="q" value="{{ query }}" placeholder="Search your notes...">
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+    {% if results %}
+    <hr style="margin:1.25rem 0;border-color:#f1f3f5">
+    {% for r in results %}
+    <div style="padding:0.55rem 0;border-bottom:1px solid #f1f3f5;font-size:0.88rem">{{ r.content }}</div>
+    {% endfor %}
+    {% elif query %}
+    <p style="color:#6c757d;font-size:0.85rem;margin-top:1rem">No results for "{{ query }}".</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

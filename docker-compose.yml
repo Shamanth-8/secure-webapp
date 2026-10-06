@@ -1,0 +1,78 @@
+# docker-compose.yml — Secure Flask app + nginx reverse proxy
+#
+# WHY A REVERSE PROXY:
+#   Flask/Gunicorn should NEVER be exposed directly to the internet.
+#   nginx sits in front and handles:
+#   - TLS termination (HTTPS)
+#   - Rate limiting
+#   - Request buffering
+#   - Security headers
+#   - Serving static files efficiently
+
+services:
+  # ----------------------------------------------------------------
+  # Flask secure app
+  # ----------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: secure-flask-app:latest
+    restart: unless-stopped
+    environment:
+      # SECRET_KEY should be injected via .env file or Docker secrets
+      # Never hardcode in docker-compose
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      DATABASE_PATH: /data/secure.db
+      FLASK_DEBUG: "false"
+    volumes:
+      # Persistent SQLite storage
+      - db_data:/data
+    networks:
+      - internal
+    # Security hardening:
+    security_opt:
+      - no-new-privileges:true    # Process cannot gain more privileges
+    cap_drop:
+      - ALL                        # Drop ALL Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE           # Only add what's needed
+    read_only: true                # Read-only root filesystem
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid  # Writable /tmp (in-memory only)
+    deploy:
+      resources:
+        limits:
+          memory: 256m             # Prevent OOM attacks
+          cpus: "0.5"
+
+  # ----------------------------------------------------------------
+  # nginx reverse proxy
+  # ----------------------------------------------------------------
+  nginx:
+    build:
+      context: ./nginx       # nginx.conf + certs/ are copied into the image
+    image: secure-flask-nginx:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - internal
+      - external
+    depends_on:
+      - web
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  internal:
+    driver: bridge
+    internal: true      # Web container cannot make outbound internet connections
+  external:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local

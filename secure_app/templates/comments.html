@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Comments{% endblock %}
+{% block content %}
+<div class="container" style="max-width:640px">
+  <div class="card" style="margin-top:2rem">
+    <h2>💬 Comments</h2>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <label>Your comment</label>
+      {{ form.comment(rows=3, placeholder="Write something... (HTML is stripped for your safety)") }}
+      <button type="submit" class="btn btn-primary">Post Comment</button>
+    </form>
+    <hr style="margin:1.5rem 0;border-color:#f1f3f5">
+    {% for c in comments %}
+    <div style="padding:0.6rem 0;border-bottom:1px solid #f1f3f5;font-size:0.9rem">{{ c.content }}</div>
+    {% else %}
+    <p style="color:#6c757d;font-size:0.85rem">No comments yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

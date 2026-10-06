@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block content %}
+<div class="container" style="max-width:740px">
+  <div class="card" style="margin-top:2rem">
+    <h2>🛡️ Admin Panel</h2>
+    <p style="color:#6c757d;font-size:0.82rem;margin-bottom:1rem">Password hashes are never shown here. <a href="{{ url_for('export') }}">Export JSON</a></p>
+    <table>
+      <thead><tr><th>ID</th><th>Username</th><th>Role</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.username }}</td>
+          <td><span class="badge {{ 'b-admin' if u.role == 'admin' else 'b-user' }}">{{ u.role }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
