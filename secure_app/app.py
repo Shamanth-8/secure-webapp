@@ -445,7 +445,8 @@ def fetch_url():
     if not is_safe_url(url):
         security_logger.warning("SSRF attempt blocked: url=%s ip=%s", url, request.remote_addr)
         abort(400, "URL not allowed")
-    with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
+    # Bandit B310 suppressed: scheme and host are already restricted by is_safe_url().
+    with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310 # nosec B310
         return resp.read().decode()[:10000]
 
 

@@ -190,8 +190,11 @@ python secure_app/app.py
 
 ### Docker
 ```bash
-# Generate a strong secret
+# Generate a strong secret (or copy .env.example to .env and fill it in)
 export SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+
+# Generate a self-signed TLS cert for nginx (certs are gitignored, never committed)
+./nginx/gen-certs.sh
 
 # Build and run
 docker-compose up --build

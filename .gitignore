@@ -1,0 +1,17 @@
+# Secrets — never commit. Copy .env.example to .env and fill it in.
+.env
+*.key
+*.pem
+nginx/certs/
+
+# Local databases (created on first run)
+*.db
+
+# Python / test artefacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/

@@ -10,11 +10,11 @@
 # TOOLS USED:
 #   Bandit  — Python-specific SAST. Finds: hardcoded passwords, shell injection,
 #             SQL injection, weak crypto, insecure random, etc.
-#   Safety  — Checks installed packages against known CVE database
-#   pip-audit — Alternative to Safety, uses PyPI advisory database
+#   pip-audit — Checks pinned dependencies against the PyPI advisory database
+#   Gitleaks  — Scans git history for committed secrets
 #
 # PIPELINE FLOW:
-#   Push → Bandit scan → Safety check → Upload SARIF to GitHub Security tab
+#   Push → Bandit scan → pip-audit → Gitleaks → Upload SARIF to GitHub Security tab
 #
 # Reading the results:
 #   Bandit assigns each finding a severity (LOW/MEDIUM/HIGH) and confidence
@@ -29,6 +29,10 @@ on:
     branches: [main]
   # Allow manual trigger
   workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # needed to upload SARIF to the Security tab
 
 jobs:
   bandit-scan:
@@ -55,27 +59,17 @@ jobs:
       - name: Bandit scan — vulnerable app
         run: |
           echo "=== SCANNING VULNERABLE APP (expect findings) ==="
-          bandit \
-            --recursive \
-            --severity-level LOW \
-            --confidence-level LOW \
-            --format txt \
-            secure-webapp/vulnerable_app/ \
-          || true   # Don't fail pipeline for the vulnerable app scan
+          bandit --recursive --severity-level low --confidence-level low \
+            vulnerable_app/ || true   # Don't fail pipeline for the vulnerable app
 
       # ----------------------------------------------------------------
-      # Scan the SECURE app — we want zero HIGH severity findings
+      # Scan the SECURE app — any HIGH severity finding fails the build
       # ----------------------------------------------------------------
       - name: Bandit scan — secure app (strict)
         run: |
           echo "=== SCANNING SECURE APP (zero high-severity tolerance) ==="
-          bandit \
-            --recursive \
-            --severity-level MEDIUM \
-            --confidence-level MEDIUM \
-            --format txt \
-            --exit-zero \
-            secure-webapp/secure_app/
+          bandit --recursive --severity-level high --confidence-level medium \
+            secure_app/
 
       # ----------------------------------------------------------------
       # Generate SARIF report for GitHub Security tab
@@ -83,13 +77,10 @@ jobs:
       # GitHub displays SARIF findings in the Security → Code Scanning tab
       # ----------------------------------------------------------------
       - name: Bandit scan — generate SARIF
+        if: always()
         run: |
-          bandit \
-            --recursive \
-            --format sarif \
-            --output bandit-results.sarif \
-            secure-webapp/ \
-          || true
+          bandit --recursive --format sarif --output bandit-results.sarif \
+            secure_app/ || true
 
       - name: Upload SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -114,19 +105,37 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit==2.7.3
 
+      # pip-audit checks pinned packages against the PyPI advisory database.
+      # The second run fails the job if any known CVE is present.
       - name: Audit dependencies
-        working-directory: secure-webapp
         run: |
-          pip install -r requirements.txt
-          # pip-audit checks installed packages against PyPI advisory database
-          pip-audit --desc --format json --output pip-audit-results.json || true
-          pip-audit --desc   # Also print to stdout for logs
+          pip-audit -r requirements.txt --desc --format json --output pip-audit-results.json || true
+          pip-audit -r requirements.txt --desc
 
       - name: Upload audit results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pip-audit-results
-          path: secure-webapp/pip-audit-results.json
+          path: pip-audit-results.json
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run pytest
+        run: |
+          pip install -r requirements.txt
+          pytest tests/ -q
 
   secret-scan:
     name: Secret Detection
